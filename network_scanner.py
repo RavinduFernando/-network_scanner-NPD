@@ -13,6 +13,7 @@ Project: Network-Scanner-Project
 import ipaddress
 import socket
 import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 COMMON_SERVICES = {
