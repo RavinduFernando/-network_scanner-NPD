@@ -15,6 +15,8 @@ import socket
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
+from datetime import datetime
+import argparse
 
 
 COMMON_SERVICES = {
@@ -321,9 +323,6 @@ def write_report(path, hosts, ports, results, started_at, finished_at):
         if not results:
             fh.write("No open ports were discovered.\n")
 
-
-from datetime import datetime
-import argparse
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="network_scanner.py",
