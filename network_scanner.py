@@ -151,3 +151,94 @@ def parse_ports(ports_str):
             ports.add(port)
     return sorted(ports)
  
+     ## Member 2 (Phase 1 — Core networking )
+
+def grab_banner(sock, timeout=1.0):
+    """Best-effort banner grab from an open socket. Returns short text or ''."""
+    try:
+        sock.settimeout(timeout)
+        data = sock.recv(128)
+        if not data:
+            return ""
+        return data.decode("utf-8", errors="replace").strip().split("\n")[0][:80]
+    except (socket.timeout, OSError):
+        return ""
+
+
+def scan_port(host, port, timeout, do_banner=False):
+    """Attempt a TCP connection to host:port.
+
+    Returns a dict describing the result. The 'state' is one of:
+      - 'open'      : connection succeeded
+      - 'closed'    : actively refused
+      - 'filtered'  : timed out (likely firewalled / dropped)
+      - 'error'     : unexpected socket error
+    """
+    result = {
+        "host": host,
+        "port": port,
+        "state": "closed",
+        "service": COMMON_SERVICES.get(port, "unknown"),
+        "banner": "",
+    }
+
+    sock = None
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        rc = sock.connect_ex((host, port))
+        if rc == 0:
+            result["state"] = "open"
+            if do_banner:
+                result["banner"] = grab_banner(sock)
+        else:
+            err_name = socket.errno.errorcode.get(rc, str(rc))
+            if err_name in ("ECONNREFUSED",):
+                result["state"] = "closed"
+            else:
+                result["state"] = "filtered"
+    except socket.timeout:
+        result["state"] = "filtered"
+    except OSError:
+        result["state"] = "error"
+    finally:
+        if sock is not None:
+            try:
+                sock.close()
+            except OSError:
+                pass
+
+    return result
+
+
+class ScanProgress:
+    """Thread-safe progress tracker that prints a single updating line."""
+
+    def __init__(self, total, enabled=True):
+        self.total = total
+        self.done = 0
+        self.lock = threading.Lock()
+        self.enabled = enabled and sys.stdout.isatty()
+
+    def tick(self):
+        with self.lock:
+            self.done += 1
+            if not self.enabled:
+                return
+            pct = (self.done / self.total) * 100 if self.total else 100
+            bar_len = 30
+            filled = int(bar_len * self.done / self.total) if self.total else bar_len
+            bar = "█" * filled + "░" * (bar_len - filled)
+            sys.stdout.write(
+                f"\r{Colors.CYAN}[*]{Colors.RESET} Scanning "
+                f"[{Colors.GREEN}{bar}{Colors.RESET}] "
+                f"{self.done}/{self.total} ({pct:5.1f}%)"
+            )
+            sys.stdout.flush()
+
+    def finish(self):
+        if self.enabled:
+            sys.stdout.write("\r" + " " * 80 + "\r")
+            sys.stdout.flush()
+
+
