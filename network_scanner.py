@@ -320,3 +320,144 @@ def write_report(path, hosts, ports, results, started_at, finished_at):
             fh.write("\n")
         if not results:
             fh.write("No open ports were discovered.\n")
+
+
+from datetime import datetime
+import argparse
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="network_scanner.py",
+        description="Multi-threaded TCP port scanner for internal network audits.",
+        epilog=(
+            "Examples:\n"
+            "  python network_scanner.py -t 192.168.1.0/24 -p 22,80,443\n"
+            "  python network_scanner.py -t 10.0.0.1-10.0.0.50 -p 1-1024 --threads 200\n"
+            "  python network_scanner.py -t example.com -p 1-65535 --timeout 0.5\n"
+            "  python network_scanner.py -t 192.168.1.1 -p 1-1024 --banner -o report.txt\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "-t", "--target", required=True,
+        help="Target IP, hostname, CIDR (e.g. 192.168.1.0/24), range, or comma list.",
+    )
+    parser.add_argument(
+        "-p", "--ports", default="1-1024",
+        help="Ports to scan: single, range, or comma list (default: 1-1024).",
+    )
+    parser.add_argument(
+        "--threads", type=int, default=100,
+        help="Number of worker threads (default: 100, max: 1000).",
+    )
+    parser.add_argument(
+        "--timeout", type=float, default=1.0,
+        help="Per-connection timeout in seconds (default: 1.0).",
+    )
+    parser.add_argument(
+        "--banner", action="store_true",
+        help="Attempt a lightweight banner grab on open ports.",
+    )
+    parser.add_argument(
+        "-o", "--output",
+        help="Write a text report to this file path.",
+    )
+    parser.add_argument(
+        "--no-color", action="store_true",
+        help="Disable ANSI colors in the output.",
+    )
+    parser.add_argument(
+        "--no-banner-art", action="store_true",
+        help="Suppress the ASCII banner.",
+    )
+    parser.add_argument(
+        "-q", "--quiet", action="store_true",
+        help="Suppress the progress bar (results still print).",
+    )
+    return parser
+
+
+def main(argv=None):
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.no_color:
+        Colors.disable()
+
+    if not args.no_banner_art:
+        print(f"{Colors.CYAN}{BANNER}{Colors.RESET}")
+
+    if args.threads < 1 or args.threads > 1000:
+        parser.error("--threads must be between 1 and 1000")
+    if args.timeout <= 0:
+        parser.error("--timeout must be greater than 0")
+
+    try:
+        hosts = parse_targets(args.target)
+    except ValueError as exc:
+        print(f"{Colors.RED}[!]{Colors.RESET} Target error: {exc}")
+        return 2
+
+    try:
+        ports = parse_ports(args.ports)
+    except ValueError as exc:
+        print(f"{Colors.RED}[!]{Colors.RESET} Port error: {exc}")
+        return 2
+
+    if not hosts:
+        print(f"{Colors.RED}[!]{Colors.RESET} No valid hosts to scan.")
+        return 2
+    if not ports:
+        print(f"{Colors.RED}[!]{Colors.RESET} No valid ports to scan.")
+        return 2
+
+    total_tasks = len(hosts) * len(ports)
+    print(f"{Colors.BLUE}[i]{Colors.RESET} Targets:  "
+          f"{Colors.BOLD}{len(hosts)}{Colors.RESET} host(s)")
+    print(f"{Colors.BLUE}[i]{Colors.RESET} Ports:    "
+          f"{Colors.BOLD}{len(ports)}{Colors.RESET} per host "
+          f"({Colors.BOLD}{total_tasks}{Colors.RESET} total connection attempts)")
+    print(f"{Colors.BLUE}[i]{Colors.RESET} Threads:  {Colors.BOLD}{args.threads}{Colors.RESET}")
+    print(f"{Colors.BLUE}[i]{Colors.RESET} Timeout:  {Colors.BOLD}{args.timeout}s{Colors.RESET}")
+    print(f"{Colors.BLUE}[i]{Colors.RESET} Banner:   "
+          f"{Colors.BOLD}{'enabled' if args.banner else 'disabled'}{Colors.RESET}")
+    print()
+
+    started_at = datetime.now()
+    print(f"{Colors.CYAN}[*]{Colors.RESET} Scan started at {started_at.isoformat(timespec='seconds')}\n")
+
+    try:
+        results = run_scan(
+            hosts=hosts,
+            ports=ports,
+            threads=args.threads,
+            timeout=args.timeout,
+            banner_grab=args.banner,
+            show_progress=not args.quiet,
+        )
+    except KeyboardInterrupt:
+        return 130
+
+    finished_at = datetime.now()
+    elapsed = (finished_at - started_at).total_seconds()
+
+    print()
+    print(f"{Colors.CYAN}[*]{Colors.RESET} Scan finished at {finished_at.isoformat(timespec='seconds')}")
+    print(f"{Colors.CYAN}[*]{Colors.RESET} Duration: {Colors.BOLD}{elapsed:.2f}s{Colors.RESET}")
+    print(f"{Colors.CYAN}[*]{Colors.RESET} Open ports discovered: "
+          f"{Colors.GREEN}{Colors.BOLD}{len(results)}{Colors.RESET}")
+
+    if args.output:
+        try:
+            write_report(args.output, hosts, ports, results, started_at, finished_at)
+            print(f"{Colors.CYAN}[*]{Colors.RESET} Report written to "
+                  f"{Colors.BOLD}{args.output}{Colors.RESET}")
+        except OSError as exc:
+            print(f"{Colors.RED}[!]{Colors.RESET} Could not write report: {exc}")
+            return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+           
