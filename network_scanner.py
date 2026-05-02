@@ -242,3 +242,79 @@ class ScanProgress:
             sys.stdout.flush()
 
 
+## Member 3 (Phase 3 — High performance)
+
+def run_scan(hosts, ports, threads, timeout, banner_grab, show_progress):
+    """Run the multi-threaded scan and return a list of open-port results."""
+    tasks = [(host, port) for host in hosts for port in ports]
+    total = len(tasks)
+    open_results = []
+    progress = ScanProgress(total, enabled=show_progress)
+
+    with ThreadPoolExecutor(max_workers=threads) as pool:
+        future_map = {
+            pool.submit(scan_port, host, port, timeout, banner_grab): (host, port)
+            for host, port in tasks
+        }
+        try:
+            for future in as_completed(future_map):
+                try:
+                    result = future.result()
+                except Exception:
+                    progress.tick()
+                    continue
+                progress.tick()
+                if result["state"] == "open":
+                    open_results.append(result)
+                    with print_lock:
+                        progress.finish()
+                        banner_txt = (
+                            f"  {Colors.DIM}{result['banner']}{Colors.RESET}"
+                            if result["banner"] else ""
+                        )
+                        print(
+                            f"{Colors.GREEN}[+]{Colors.RESET} "
+                            f"{Colors.BOLD}{result['host']}{Colors.RESET}:"
+                            f"{Colors.YELLOW}{result['port']}{Colors.RESET} "
+                            f"{Colors.CYAN}open{Colors.RESET} "
+                            f"({result['service']}){banner_txt}"
+                        )
+        except KeyboardInterrupt:
+            progress.finish()
+            print(f"\n{Colors.RED}[!]{Colors.RESET} Scan interrupted by user. Cancelling pending tasks...")
+            pool.shutdown(wait=False, cancel_futures=True)
+            raise
+
+    progress.finish()
+    return open_results
+
+
+def write_report(path, hosts, ports, results, started_at, finished_at):
+    """Write a human-readable scan report to disk."""
+    elapsed = (finished_at - started_at).total_seconds()
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write("Network Scanner Report\n")
+        fh.write("=" * 60 + "\n")
+        fh.write(f"Started:   {started_at.isoformat(timespec='seconds')}\n")
+        fh.write(f"Finished:  {finished_at.isoformat(timespec='seconds')}\n")
+        fh.write(f"Duration:  {elapsed:.2f}s\n")
+        fh.write(f"Hosts:     {len(hosts)}\n")
+        fh.write(f"Ports:     {len(ports)} (per host)\n")
+        fh.write(f"Findings:  {len(results)} open port(s)\n")
+        fh.write("=" * 60 + "\n\n")
+
+        by_host = {}
+        for r in results:
+            by_host.setdefault(r["host"], []).append(r)
+        for host in sorted(by_host, key=lambda x: ipaddress.ip_address(x)):
+            fh.write(f"Host: {host}\n")
+            fh.write("-" * 40 + "\n")
+            fh.write(f"{'PORT':>6}  {'STATE':<10}  {'SERVICE':<14}  BANNER\n")
+            for r in sorted(by_host[host], key=lambda x: x["port"]):
+                fh.write(
+                    f"{r['port']:>6}  {r['state']:<10}  "
+                    f"{r['service']:<14}  {r['banner']}\n"
+                )
+            fh.write("\n")
+        if not results:
+            fh.write("No open ports were discovered.\n")
