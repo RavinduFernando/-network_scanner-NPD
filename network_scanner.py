@@ -18,6 +18,15 @@ import sys
 from datetime import datetime
 import argparse
 
+BANNER = r"""
+   _   _      _   ____                                     
+  | \ | | ___| |_/ ___|  ___ __ _ _ __  _ __   ___ _ __   
+  |  \| |/ _ \ __\___ \ / __/ _` | '_ \| '_ \ / _ \ '__|  
+  | |\  |  __/ |_ ___) | (_| (_| | | | | | | |  __/ |     
+  |_| \_|\___|\__|____/ \___\__,_|_| |_|_| |_|\___|_|     
+                                                          
+        Multi-Threaded TCP Network Auditor v1.0
+"""
 
 COMMON_SERVICES = {
     21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
