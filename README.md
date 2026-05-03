@@ -11,6 +11,14 @@ The tool scans single hosts, IP ranges, full CIDR blocks, or hostnames in parall
 - **TCP Connect Scanning** using the standard `socket` module with strict per-connection timeouts so filtered/dropped ports never stall the scan.
 - **Subnet & range parsing** powered by the `ipaddress` module — supports single IPs, hostnames, CIDR blocks (`192.168.1.0/24`), inclusive ranges (`10.0.0.1-10.0.0.50`), and comma-separated mixes of all of them.
 - **Flexible port specification** — single ports, ranges (`1-1024`), or comma lists (`22,80,443,8000-8100`).
+- **High-performance multi-threading** via `concurrent.futures.ThreadPoolExecutor` with a configurable worker count.
+- **Professional CLI** with `argparse` — clear `--help`, validated input, and rich examples.
+- **Live progress bar** that updates in place as the scan runs.
+- **Color-coded output** with ANSI styling (auto-disabled in non-TTY environments via `--no-color`).
+- **Service identification** for ~70 well-known TCP services.
+- **Optional banner grabbing** (`--banner`) for quick service fingerprinting on open ports.
+- **Text reports** (`-o report.txt`) grouped by host for documentation and audit trails.
+- **Graceful Ctrl+C handling** — pending tasks are cancelled cleanly.
 
 --
 ## Requirements
