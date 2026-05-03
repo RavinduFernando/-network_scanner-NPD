@@ -171,16 +171,6 @@ Work is fanned out with `concurrent.futures.ThreadPoolExecutor`. Every `(host, p
 
 This project is developed and tracked through a GitHub repository named **`Network-Scanner-Project`**. Every group member is expected to have a visible commit history reflecting their contributions across the four development phases.
 
-Suggested workflow:
-
-1. Each member forks or clones the repository and works on a feature branch:
-   ```bash
-   git checkout -b feature/<your-name>-<phase>
-   ```
-2. Commits should be small, descriptive, and signed with the author's name/email so contribution history is clear.
-3. Open Pull Requests against `main`; require at least one peer review before merging.
-4. Tag releases at the end of each phase (e.g., `v0.1-core-networking`, `v0.2-subnet-parsing`, `v0.3-multithreading`, `v1.0-cli`).
-
 ---
 
 ## Responsible Use
