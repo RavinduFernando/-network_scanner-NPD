@@ -37,3 +37,15 @@ chmod +x network_scanner.py
 ./network_scanner.py --help
 
 ---
+
+---
+
+## Project Structure
+
+```text
+Network-Scanner-Project/
+├── network_scanner.py   # The full scanner (single-file, no external deps)
+└── README.md            # This file
+```
+
+---
